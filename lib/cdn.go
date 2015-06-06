@@ -2,9 +2,11 @@ package cdn
 
 import (
 	"github.com/go-martini/martini"
+	"strings"
 )
 
 type Config struct {
+	Root 	 string
 	MaxSize  int
 	TailOnly bool
 	ShowInfo bool
@@ -17,14 +19,18 @@ func Cdn(c Config) func(r martini.Router) {
 	if conf.MaxSize == 0 {
 		conf.MaxSize = 1000
 	}
+	if strings.LastIndex(conf.Root,"/")!=len(conf.Root)-1 {
+		conf.Root=conf.Root+"/"
+	}
 
 	return func(r martini.Router) {
 		if conf.ShowInfo {
-			r.Get("/:coll", getIndex)
-			r.Get("/:coll/_stats", getStat)
+			//r.Get("/:name", getIndex)
+			//r.Get("/:name/_stats", getStat)
 		}
-		r.Post("/:coll", post)
-		r.Get("/:coll/:_id", get)
-		r.Get("/:coll/:_id/:file", get)
+		r.Post("/:name",auth, post)
+		r.Get("/:name/:file",auth, get)
 	}
 }
+
+

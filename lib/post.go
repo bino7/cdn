@@ -1,28 +1,31 @@
 package cdn
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
-
+	"fmt"
+	"os"
 	"github.com/go-martini/martini"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
+	"strings"
 )
 
-func post(w http.ResponseWriter, req *http.Request, vars martini.Params, db *mgo.Database) {
-	formFile, formHead, err := req.FormFile("field")
+func post(w http.ResponseWriter, r *http.Request,vars martini.Params) {
+
+	// the FormFile function takes in the POST input id file
+	file, header, err := r.FormFile("file")
+
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("400 Bad Request"))
+		fmt.Fprintln(w, err)
 		return
 	}
-	defer formFile.Close()
 
+
+	defer file.Close()
+
+	root:=conf.Root
 	//remove any directory names in the filename
 	//START: work around IE sending full filepath and manually get filename
-	itemHead := formHead.Header["Content-Disposition"][0]
+	itemHead := header.Header["Content-Disposition"][0]
 	lookfor := "filename=\""
 	fileIndex := strings.Index(itemHead, lookfor)
 
@@ -45,42 +48,26 @@ func post(w http.ResponseWriter, req *http.Request, vars martini.Params, db *mgo
 		filename = filename[slashIndex+1:]
 	}
 	//END: work around IE sending full filepath
-
-	// GridFs actions
-	file, err := db.GridFS(vars["coll"]).Create(filename)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("400 Bad Request"))
-		return
+	name:=vars["name"]
+	dir:=root+name+"/"
+	_, err = os.Stat(dir)
+	if fileExist(dir)==false{
+		os.MkdirAll(dir,0777)
 	}
-	defer file.Close()
-
-	io.Copy(file, formFile)
+	out, err := os.Create(dir+filename)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("400 Bad Request"))
+		fmt.Fprintf(w, "Unable to create the file for writing. Check your write access privilege")
 		return
 	}
 
-	b := make([]byte, 512)
-	formFile.Seek(0, 0)
-	formFile.Read(b)
+	defer out.Close()
 
-	file.SetContentType(http.DetectContentType(b))
-	file.SetMeta(req.Form)
-	err = file.Close()
-
-	_id, _ := file.Id().(bson.ObjectId)
-
-	// json response
-	field := "/" + _id.Hex() + "/" + filename
-	if !conf.TailOnly {
-		field = "/" + vars["coll"] + field
+	// write the content from POST to the file
+	_, err = io.Copy(out, file)
+	if err != nil {
+		fmt.Fprintln(w, err)
 	}
 
-	bytes, _ := json.Marshal(map[string]interface{}{
-		"error": err,
-		"field": field,
-	})
-	w.Write(bytes)
+	fmt.Fprintf(w, "File uploaded successfully : ")
+	fmt.Fprintf(w, header.Filename)
 }

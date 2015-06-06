@@ -6,21 +6,17 @@ import (
 	"os"
 
 	"github.com/go-martini/martini"
-	"github.com/olebedev/cdn/lib"
-	"github.com/olebedev/config"
-	"labix.org/v2/mgo"
+	"github.com/bino7/config"
+	"cdn/lib"
 )
 
 var conf, _ = config.ParseYaml(`
-debug: false
+debug: true
 port: 5000
 maxSize: 1000
 showInfo: true
 tailOnly: false
-mongo:
-  uri: localhost
-mongodb:
-  database: cdn
+root: /home/bino/cdn/
 `)
 
 func main() {
@@ -33,21 +29,18 @@ func main() {
 	m.MapTo(r, (*martini.Routes)(nil))
 	m.Action(r.Handle)
 
-	session, err := mgo.Dial(conf.UString("mongo.uri"))
-	if err != nil {
-		panic(err)
-	}
-	session.SetMode(mgo.Monotonic, true)
-	db := session.DB(conf.UString("mongodb.database"))
+	m.Use(func(){
 
+	})
 	logger := log.New(os.Stdout, "\x1B[36m[cdn] >>\x1B[39m ", 0)
 	m.Map(logger)
-	m.Map(db)
 
 	r.Group("", cdn.Cdn(cdn.Config{
+		Root:	  conf.UString("root"),
 		MaxSize:  conf.UInt("maxSize"),
 		ShowInfo: conf.UBool("showInfo"),
 		TailOnly: conf.UBool("tailOnly"),
+
 	}))
 
 	logger.Println("Server started at :" + conf.UString("port", "5000"))

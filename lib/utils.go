@@ -3,6 +3,8 @@ package cdn
 import (
 	"regexp"
 	"strconv"
+	"os"
+	"strings"
 )
 
 // it in list
@@ -40,4 +42,15 @@ func parseParams(s string) ([]int, error) {
 	}
 
 	return res, err
+}
+
+func fileExist(filename string) bool {
+	_, err := os.Stat(filename)
+	return err == nil || os.IsExist(err)
+}
+
+func isImage(file os.File)bool{
+	return strings.LastIndex(file.Name(),".png")==len(file.Name())-4	||
+	strings.LastIndex(file.Name(),".jpg")==len(file.Name())-4 ||
+	strings.LastIndex(file.Name(),".jpeg")==len(file.Name())-5
 }
